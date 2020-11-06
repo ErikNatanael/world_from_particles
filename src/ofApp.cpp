@@ -2,6 +2,8 @@
 #include "ofxCv.h"
 #include "ofxJSON.h"
 
+#include "Country.h"
+
 //--------------------------------------------------------------
 void ofApp::setup(){
 
@@ -38,10 +40,11 @@ void ofApp::setup(){
     };
 
     // Generate triangles from all of the countries
-    countries = geojson.getFeatureNames();
-    for(auto& c : countries) {
+    countryNames = geojson.getFeatureNames();
+    for(auto& c : countryNames) {
         generateTrianglesFromCountry(c);
         pointsPerCountry.insert({c, 0});
+        countries.insert({c, Country()});
     }
 
     fbo.allocate(3840, 2160, GL_RGBA32F);
@@ -70,7 +73,7 @@ void ofApp::setup(){
     cout << renderDirectory << endl;
 
 
-    for(auto& c : countries) {
+    for(auto& c : countryNames) {
         drawTriangles(c);
     }
 
@@ -110,9 +113,9 @@ void ofApp::draw(){
 
     // for(int i=0; i < 500; i++) {
     //     ofSetColor(255, 0, 0, 100);
-    //     int index = ofRandom(countries.size());
+    //     int index = ofRandom(countryNames.size());
     //     // float size = ofRandom(1);
-    //     drawPointInCountry(countries[index], 1.0);
+    //     drawPointInCountry(countryNames[index], 1.0);
 
     //     drawPointInCountry("Sweden", 1.0);
     //     drawPointInCountry("Ireland", 1.0);
@@ -128,8 +131,14 @@ void ofApp::draw(){
 
     for (std::pair<std::string, int> element : pointsPerCountry) {
         
-        drawPointInCountry(element.first, 1.0, element.second);
+        // drawPointInCountry(element.first, 1.0, element.second);
+        addPointToCountry(element.first, 1.0, element.second, c);
         element.second = 0;
+    }
+
+    for (std::pair<std::string, Country> element : countries) {
+        
+        element.second.draw();
     }
     
     cam.end();
@@ -137,8 +146,9 @@ void ofApp::draw(){
 
     ofSetColor(255);
     renderFbo.begin();
+        ofClear(255);
         ofEnableBlendMode(OF_BLENDMODE_ALPHA);
-        ofSetColor(255, 100);
+        ofSetColor(255, 255);
         fbo.draw(0, 0);
     renderFbo.end();
 
@@ -184,6 +194,37 @@ void ofApp::drawPointInCountry(string country, float size, int numPoints) {
             size = max(size + dist2ToPoints, 0.0f);
             size *= 0.1;
             ofDrawEllipse(x, y, size, size);
+        }
+    }
+}
+
+void ofApp::addPointToCountry(string country, float size, int numPoints, ofColor col) {
+    // Method:
+    // 1. Convert the meshes to triangles
+    // 2. Pick a random triangle (potentially weighted by the relative area of the triangles)
+    // 3. Pick a random point within the triangle using
+    //  P = (1 - sqrt(r1)) * A + (sqrt(r1) * (1 - r2)) * B + (r2 * sqrt(r1)) * C
+    // where r1 and r2 are uniform random numbers between 0 and 1 and A, B and C are vertices of a triangle
+    auto it = countryTriangles.find(country);
+    if(it != countryTriangles.end()) {
+        auto& triangles = it->second;
+        for(int i = 0; i < numPoints; i++) {
+            int index = ofRandom(triangles.size());
+            auto& p = triangles[index].points;
+            float r1 = ofRandom(1.0);
+            float r2 = ofRandom(1.0);
+            float sqrtr1 = sqrt(r1);
+            float min1sqrtr1 = 1-sqrtr1;
+            float secondTerm = sqrtr1 * (1-r2);
+            float thirdTerm = r2 * sqrtr1;
+            float x = min1sqrtr1 * p[0].x + secondTerm * p[1].x + thirdTerm * p[2].x;
+            float y = min1sqrtr1 * p[0].y + secondTerm * p[1].y + thirdTerm * p[2].y;
+            glm::vec2 point = glm::vec2(x, y);
+
+            auto it2 = countries.find(country);
+            if(it2 != countries.end()) {
+                it2->second.addPoint(point, col);
+            }
         }
     }
 }
@@ -364,8 +405,8 @@ void ofApp::onMessage( ofxLibwebsockets::Event& args ){
     }
     // "Virgin Islands", "Brittish Virgin Islans", "Hong Kong (China)", "Saint Kitts and Nevis", "Singapore", 
     // "Mauritius", "Macau (China)", "Maldives", "Palestinian Territory", "Bahrain"
-    auto it = std::find(countries.begin(), countries.end(), country);
-    if(it == countries.end() && country != "") {
+    auto it = std::find(countryNames.begin(), countryNames.end(), country);
+    if(it == countryNames.end() && country != "") {
         ofLog() << country;
     }
 

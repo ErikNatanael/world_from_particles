@@ -5,6 +5,7 @@
 #include "ofxCv.h"
 
 #include "ofxLibwebsockets.h"
+#include "Country.h"
 
 using namespace cv;
 using namespace ofxCv;
@@ -38,6 +39,7 @@ class ofApp : public ofBaseApp{
 		void gotMessage(ofMessage msg);
 
 		void drawPointInCountry(string country, float size, int numPoints);
+		void addPointToCountry(string country, float size, int numPoints, ofColor col);
 		void drawTriangles(string country);
 
 		void generateTrianglesFromCountry(string country);
@@ -62,9 +64,10 @@ class ofApp : public ofBaseApp{
 		Rect rect;
 
 		unordered_map<string, vector<Triangle>> countryTriangles;
-		vector<string> countries;
+		vector<string> countryNames;
 
 		unordered_map<string, int> pointsPerCountry;
+		unordered_map<string, Country> countries;
 
 		vector<glm::vec3> points;
 
